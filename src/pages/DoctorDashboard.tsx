@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users, AlertCircle, TrendingUp, TrendingDown, Activity, Eye, Bell } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { DoctorChatBot } from '../components/DoctorChatBot';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, Profile, Alert } from '../lib/supabase';
 
@@ -331,6 +332,7 @@ export function DoctorDashboard() {
           </motion.div>
         </div>
       </div>
+      <DoctorChatBot patients={patients} alerts={alerts} />
     </div>
   );
 }

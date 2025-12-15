@@ -9,6 +9,7 @@ import { RegisterPage } from './pages/RegisterPage';
 import { PatientDashboard } from './pages/PatientDashboard';
 import { DoctorDashboard } from './pages/DoctorDashboard';
 import { AdminDashboard } from './pages/AdminDashboard';
+
 import { Activity } from 'lucide-react';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
