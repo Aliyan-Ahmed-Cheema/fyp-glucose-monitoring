@@ -7,7 +7,8 @@ interface AuthContextType {
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, fullName: string, role: UserRole) => Promise<void>;
+  // 1. Added patientMetaData parameter to the interface
+  signUp: (email: string, password: string, fullName: string, role: UserRole, patientMetaData?: Record<string, any>) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -68,7 +69,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
   };
 
-  const signUp = async (email: string, password: string, fullName: string, role: UserRole) => {
+  // 2. Updated signature to accept patientMetaData
+  const signUp = async (email: string, password: string, fullName: string, role: UserRole, patientMetaData?: Record<string, any>) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -84,6 +86,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email,
           full_name: fullName,
           role,
+          // 3. Spread the extra demographic data into the Supabase insert!
+          ...(patientMetaData || {})
         });
 
       if (profileError) throw profileError;

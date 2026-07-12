@@ -1,12 +1,22 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Activity, Database, Link2, Plus, X } from 'lucide-react';
+import { Users, Activity, Link2, X, UserMinus, HeartPulse } from 'lucide-react';
 import { supabase, Profile } from '../lib/supabase';
 
+// 1. Extend the profile to include the new physical demographics
+interface ExtendedProfile extends Profile {
+  age?: number;
+  gender?: number;
+  height?: number;
+  weight?: number;
+}
+
 export function AdminDashboard() {
-  const [users, setUsers] = useState<Profile[]>([]);
-  const [doctors, setDoctors] = useState<Profile[]>([]);
-  const [patients, setPatients] = useState<Profile[]>([]);
+  const [users, setUsers] = useState<ExtendedProfile[]>([]);
+  const [doctors, setDoctors] = useState<ExtendedProfile[]>([]);
+  const [patients, setPatients] = useState<ExtendedProfile[]>([]);
+  const [assignedPatientIds, setAssignedPatientIds] = useState<Set<string>>(new Set());
+  
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState('');
   const [selectedDoctor, setSelectedDoctor] = useState('');
@@ -18,15 +28,25 @@ export function AdminDashboard() {
 
   const fetchData = async () => {
     try {
+      // Fetch all users
       const { data: allUsers } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
 
+      // Fetch existing assignments to find out who is unassigned
+      const { data: assignments } = await supabase
+        .from('doctor_patient_assignments')
+        .select('patient_id');
+
       if (allUsers) {
         setUsers(allUsers);
         setDoctors(allUsers.filter(u => u.role === 'doctor'));
         setPatients(allUsers.filter(u => u.role === 'patient'));
+      }
+
+      if (assignments) {
+        setAssignedPatientIds(new Set(assignments.map(a => a.patient_id)));
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -46,16 +66,22 @@ export function AdminDashboard() {
           patient_id: selectedPatient,
         });
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === '23505') throw new Error("This patient is already assigned to a doctor!");
+        throw error;
+      }
 
       setShowAssignModal(false);
       setSelectedPatient('');
       setSelectedDoctor('');
       alert('Patient assigned successfully!');
+      fetchData(); // Refresh the stats and list
     } catch (error: any) {
       alert(`Error: ${error.message}`);
     }
   };
+
+  const unassignedCount = patients.length - assignedPatientIds.size;
 
   const stats = [
     {
@@ -71,16 +97,18 @@ export function AdminDashboard() {
       color: 'bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400',
     },
     {
-      title: 'Active Patients',
+      title: 'Total Patients',
       value: patients.length,
-      icon: Users,
+      icon: HeartPulse,
       color: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400',
     },
     {
-      title: 'Active Sensors',
-      value: patients.length,
-      icon: Database,
-      color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400',
+      title: 'Unassigned Patients', // Replaced the fake sensor stat!
+      value: unassignedCount > 0 ? unassignedCount : 0,
+      icon: UserMinus,
+      color: unassignedCount > 0 
+        ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' // Turns red if action needed!
+        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400', 
     },
   ];
 
@@ -103,7 +131,7 @@ export function AdminDashboard() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
                 Admin Dashboard
@@ -171,6 +199,10 @@ export function AdminDashboard() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Role
                   </th>
+                  {/* NEW DEMOGRAPHICS COLUMN */}
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Demographics
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Joined
                   </th>
@@ -198,6 +230,23 @@ export function AdminDashboard() {
                         {user.role}
                       </span>
                     </td>
+                    
+                    {/* DEMOGRAPHICS LOGIC */}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {user.role === 'patient' ? (
+                        <div>
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">
+                            {user.age ? `${user.age} yrs` : 'N/A'} • {user.gender?.toString() === '1' ? 'Male' : user.gender?.toString() === '0' ? 'Female' : 'N/A'}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            Ht: {user.height ? `${user.height}cm` : '-'} | Wt: {user.weight ? `${user.weight}kg` : '-'}
+                          </p>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-gray-400 dark:text-gray-600">-</span>
+                      )}
+                    </td>
+
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                       {new Date(user.created_at).toLocaleDateString()}
                     </td>
@@ -239,11 +288,14 @@ export function AdminDashboard() {
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
                 >
                   <option value="">Choose a patient...</option>
-                  {patients.map((patient) => (
-                    <option key={patient.id} value={patient.id}>
-                      {patient.full_name} ({patient.email})
-                    </option>
-                  ))}
+                  {patients.map((patient) => {
+                    const isAssigned = assignedPatientIds.has(patient.id);
+                    return (
+                      <option key={patient.id} value={patient.id}>
+                        {isAssigned ? '✓ ' : '⚠️ '} {patient.full_name} {isAssigned ? '(Assigned)' : '(Needs Doctor)'}
+                      </option>
+                    )
+                  })}
                 </select>
               </div>
 
@@ -259,13 +311,13 @@ export function AdminDashboard() {
                   <option value="">Choose a doctor...</option>
                   {doctors.map((doctor) => (
                     <option key={doctor.id} value={doctor.id}>
-                      {doctor.full_name} ({doctor.email})
+                      Dr. {doctor.full_name}
                     </option>
                   ))}
                 </select>
               </div>
 
-              <div className="flex space-x-3">
+              <div className="flex space-x-3 pt-4">
                 <button
                   onClick={() => setShowAssignModal(false)}
                   className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"

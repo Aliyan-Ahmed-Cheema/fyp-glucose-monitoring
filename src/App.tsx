@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
-import { MockDataProvider } from './contexts/MockDataContext';
+import { RealDataProvider } from './contexts/RealDataContext'; // <-- Now using the Real Data!
 import { Navbar } from './components/Navbar';
 import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
@@ -92,9 +92,10 @@ function App() {
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
-          <MockDataProvider>
+          {/* Swapped MockDataProvider with RealDataProvider right here! */}
+          <RealDataProvider>
             <AppContent />
-          </MockDataProvider>
+          </RealDataProvider>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>
